@@ -37,8 +37,19 @@ class GameFragment : Fragment() {
     // The current score
     private var score = 0
 
+    data class Game(val word: String, var corrected: Boolean = false, var skipped: Boolean = false)
+
     // The list of words - the front of the list is the next word to guess
-    private lateinit var wordList: MutableList<String>
+    // Need to be mutable #sad
+    val wordList: MutableList<Game> = mutableListOf(
+            Game("queen"), Game("hospital"), Game("basketball"),
+            Game("cat"), Game("change"), Game("snail"),
+            Game("soup"), Game("calendar"), Game("sad"),
+            Game("desk"), Game("guitar"), Game("home"),
+            Game("railway"), Game("zebra"), Game("jelly"),
+            Game("car"), Game("crow"), Game("trade"),
+            Game("bag"), Game("roll"), Game("bubble")
+    )
 
     private lateinit var binding: GameFragmentBinding
 
@@ -56,7 +67,7 @@ class GameFragment : Fragment() {
         // TODO (04) Create and initialize a GameViewModel, using ViewModelProviders; Add a log
         // statement
 
-        resetList()
+        // resetList()
         nextWord()
 
         binding.correctButton.setOnClickListener { onCorrect() }
@@ -67,41 +78,62 @@ class GameFragment : Fragment() {
 
     }
 
+    /* Methods to maintain the mutable list */
+    private fun getCurrentWord(): Game {
+        return wordList.filterNot { w -> (w.corrected || w.skipped) }.shuffled().first()
+    }
+
+    private fun setWordAsSkipped(word: String): Unit {
+        wordList.filter { w -> w.word == word }.map { w -> w.skipped = true }
+    }
+
+    private fun setWordAsCorrected(word: String): Unit {
+        wordList.filter { w -> w.word == word }.map { w -> w.corrected = true }
+    }
+
+    private fun isGameFinished(): Boolean {
+        return wordList.filterNot {  w -> (w.corrected || w.skipped) }.isEmpty()
+    }
+
+    private fun getCorrected(): Int {
+        return wordList.filter { w -> w.corrected }.size
+    }
+
     /**
      * Resets the list of words and randomizes the order
      */
-    private fun resetList() {
-        wordList = mutableListOf(
-                "queen",
-                "hospital",
-                "basketball",
-                "cat",
-                "change",
-                "snail",
-                "soup",
-                "calendar",
-                "sad",
-                "desk",
-                "guitar",
-                "home",
-                "railway",
-                "zebra",
-                "jelly",
-                "car",
-                "crow",
-                "trade",
-                "bag",
-                "roll",
-                "bubble"
-        )
-        wordList.shuffle()
-    }
+//    private fun resetList() {
+//        wordList = mutableListOf(
+//                "queen",
+//                "hospital",
+//                "basketball",
+//                "cat",
+//                "change",
+//                "snail",
+//                "soup",
+//                "calendar",
+//                "sad",
+//                "desk",
+//                "guitar",
+//                "home",
+//                "railway",
+//                "zebra",
+//                "jelly",
+//                "car",
+//                "crow",
+//                "trade",
+//                "bag",
+//                "roll",
+//                "bubble"
+//        )
+        // wordList.shuffle()
+//    }
 
     /**
      * Called when the game is finished
      */
     private fun gameFinished() {
-        val action = GameFragmentDirections.actionGameToScore(score)
+        val action = GameFragmentDirections.actionGameToScore(getCorrected())
         findNavController(this).navigate(action)
     }
 
@@ -110,11 +142,14 @@ class GameFragment : Fragment() {
      */
     private fun nextWord() {
         //Select and remove a word from the list
-        if (wordList.isEmpty()) {
+        if (isGameFinished()) {
             gameFinished()
         } else {
-            word = wordList.removeAt(0)
+//            word = wordList.removeAt(0)
+            val current: Game = getCurrentWord()
+            word = current.word
         }
+
         updateWordText()
         updateScoreText()
     }
@@ -122,12 +157,14 @@ class GameFragment : Fragment() {
     /** Methods for buttons presses **/
 
     private fun onSkip() {
-        score--
+        // score--
+        setWordAsSkipped(word)
         nextWord()
     }
 
     private fun onCorrect() {
-        score++
+        // score++
+        setWordAsCorrected(word)
         nextWord()
     }
 
@@ -139,6 +176,6 @@ class GameFragment : Fragment() {
     }
 
     private fun updateScoreText() {
-        binding.scoreText.text = score.toString()
+        binding.scoreText.text = getCorrected().toString()
     }
 }
