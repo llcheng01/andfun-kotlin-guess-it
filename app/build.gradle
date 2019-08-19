@@ -61,5 +61,5 @@ dependencies {
 
     implementation 'com.jakewharton.timber:timber:4.7.1'
 
-    // TODO (01) Add lifecycle-extensions gradle
+    implementation 'androidx.lifecycle:lifecycle-extensions:2.0.0'
 }
