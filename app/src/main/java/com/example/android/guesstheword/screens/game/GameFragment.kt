@@ -76,8 +76,6 @@ class GameFragment : Fragment() {
         viewModel.currentTime.observe(this, Observer { newTime ->
             binding.timerText.text = DateUtils.formatElapsedTime(newTime)
         })
-        // resetList()
-        // viewModel.nextWord()
 
         binding.correctButton.setOnClickListener {
             viewModel.onCorrect()
