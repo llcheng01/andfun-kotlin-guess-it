@@ -16,72 +16,95 @@
 
 package com.example.android.guesstheword.screens.game
 
+import android.os.CountDownTimer
+import android.text.format.DateUtils
 import android.util.Log
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import timber.log.Timber
 
-class GameViewModel : ViewModel() {
+data class Game(val word: String, var corrected: Boolean = false, var skipped: Boolean = false)
+//data class Board(val currentWord: String = "", val score: Int = 0)
+
+class GameViewModel(val wordList: MutableList<Game>) : ViewModel() {
     // MAINTAINING STATE!!!
     // The current currentWord
-    var currentWord = ""
+    private val _currentWordNotifier = MutableLiveData<String>()
+    val currentWordNotifier: LiveData<String>
+        get() = _currentWordNotifier
 
-    data class Game(val word: String, var corrected: Boolean = false, var skipped: Boolean = false)
+    private val _scoreNotifier = MutableLiveData<Int>()
+    val scoreNotifier: LiveData<Int>
+        get() = _scoreNotifier
 
-    // The list of words - the front of the list is the next currentWord to guess
-    // Need to be mutable #sad
-    val wordList: MutableList<Game> = mutableListOf(
-            Game("queen"), Game("hospital"), Game("basketball")
-//            ,
-//            Game("cat"), Game("change"), Game("snail"),
-//            Game("soup"), Game("calendar"), Game("sad"),
-//            Game("desk"), Game("guitar"), Game("home"),
-//            Game("railway"), Game("zebra"), Game("jelly"),
-//            Game("car"), Game("crow"), Game("trade"),
-//            Game("bag"), Game("roll"), Game("bubble")
-    )
+    // Game Finish toggle
+    private val _isGameFinished = MutableLiveData<Boolean>()
+    val isGameFinished: LiveData<Boolean>
+        get() = _isGameFinished
+
+    private val _currentTime = MutableLiveData<Long>()
+    val currentTime: LiveData<Long>
+        get() = _currentTime
+
+    private val timer: CountDownTimer
+
+    // Constants for Timer
+    companion object {
+        // These represent different important times
+        // This is when the game is over
+        const val DONE = 0L
+        // This is the number of milliseconds in a second
+        const val ONE_SECOND = 1000L
+        // This is the total time of the game
+        const val COUNTDOWN_TIME = 10000L
+    }
+
+    /** Local State !!! */
+    // private var currentWord: String = ""
 
     init {
         Timber.i("GameView Model Created!")
         Log.i("GameViewModel", "GameView Model Created!")
+        timer = object : CountDownTimer(COUNTDOWN_TIME, ONE_SECOND) {
+
+            override fun onTick(millisUntilFinished: Long) {
+                _currentTime.value = (millisUntilFinished / ONE_SECOND)
+            }
+
+            override fun onFinish() {
+                _isGameFinished.value = true
+            }
+        }
+
+        timer.start()
+
+        _currentWordNotifier.value = getNextWord().word
+        _scoreNotifier.value = getCorrected()
     }
 
     override fun onCleared() {
         super.onCleared()
         Timber.i("GameView Model Destroyed!")
         Log.i("GameViewModel", "GameView Model Destroyed!")
-    }
-
-    /* Methods to maintain the mutable list */
-    private fun getCurrentWord(): Game {
-        return wordList.filterNot { w -> (w.corrected || w.skipped) }.shuffled().first()
-    }
-
-    private fun setWordAsSkipped(word: String): Unit {
-        wordList.filter { w -> w.word == word }.map { w -> w.skipped = true }
-    }
-
-    private fun setWordAsCorrected(word: String): Unit {
-        wordList.filter { w -> w.word == word }.map { w -> w.corrected = true }
-    }
-
-    private fun isGameFinished(): Boolean {
-        return wordList.filterNot {  w -> (w.corrected || w.skipped) }.isEmpty()
-    }
-
-    fun getCorrected(): Int {
-        return wordList.filter { w -> w.corrected }.size
+        timer.cancel()
     }
 
     /** Methods for buttons presses **/
+    /** Only methods to modify LiveData!! **/
     fun onSkip() {
         // score--
-        setWordAsSkipped(currentWord)
+        setWordAsSkipped(getWordAtPlay())
+        // update score and word
+        _scoreNotifier.value = getCorrected()
         nextWord()
     }
 
     fun onCorrect() {
         // score++
-        setWordAsCorrected(currentWord)
+        setWordAsCorrected(getWordAtPlay())
+        // update score and word
+        _scoreNotifier.value = getCorrected()
         nextWord()
     }
 
@@ -91,11 +114,45 @@ class GameViewModel : ViewModel() {
     fun nextWord() {
         //Select and remove a currentWord from the list
         if (isGameFinished()) {
-            //TODO
-//            gameFinished()
+            resetWordList()
         } else {
-            val current: Game = getCurrentWord()
-            currentWord = current.word
+            _currentWordNotifier.value = getNextWord().word
         }
+    }
+
+    fun getWordAtPlay(): String {
+        // This is a hack!!
+        return _currentWordNotifier.value?: ""
+    }
+
+    fun resetGameFinished() {
+        _isGameFinished.value = false
+    }
+
+
+    /* Methods to maintain the mutable list */
+    fun resetWordList(): Unit {
+        // Why is w.copy doesn't work???
+        wordList.map { w -> w.corrected = false; w.skipped = false }
+    }
+
+    fun getNextWord(): Game {
+        return wordList.filterNot { w -> (w.corrected || w.skipped) }.shuffled().first()
+    }
+
+    fun setWordAsSkipped(word: String): Unit {
+        wordList.filter { w -> w.word == word }.map { w -> w.skipped = true }
+    }
+
+    fun setWordAsCorrected(word: String): Unit {
+        wordList.filter { w -> w.word == word }.map { w -> w.corrected = true }
+    }
+
+    fun isGameFinished(): Boolean {
+        return wordList.filterNot {  w -> (w.corrected || w.skipped) }.isEmpty()
+    }
+
+    fun getCorrected(): Int {
+        return wordList.filter { w -> w.corrected }.size
     }
 }

@@ -17,12 +17,14 @@
 package com.example.android.guesstheword.screens.game
 
 import android.os.Bundle
+import android.text.format.DateUtils
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.databinding.DataBindingUtil
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.Observer
 import androidx.lifecycle.ViewModelProviders
 import androidx.navigation.fragment.NavHostFragment.findNavController
 import com.example.android.guesstheword.R
@@ -38,6 +40,17 @@ class GameFragment : Fragment() {
 
     private lateinit var binding: GameFragmentBinding
 
+    // The list of words - the front of the list is the next currentWord to guess
+    // Need to be mutable #sad
+    val wordList = mutableListOf(Game("queen"), Game("hospital"), Game("basketball"))
+//            ,
+//            Game("cat"), Game("change"), Game("snail"),
+//            Game("soup"), Game("calendar"), Game("sad"),
+//            Game("desk"), Game("guitar"), Game("home"),
+//            Game("railway"), Game("zebra"), Game("jelly"),
+//            Game("car"), Game("crow"), Game("trade"),
+//            Game("bag"), Game("roll"), Game("bubble")
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?,
                               savedInstanceState: Bundle?): View? {
 
@@ -51,23 +64,28 @@ class GameFragment : Fragment() {
 
         Timber.i( "Called ViewModelProviders.of")
         Log.i("GameFragment", "Called ViewModelProviders.of")
-        viewModel = ViewModelProviders.of(this).get(GameViewModel::class.java)
-
+        viewModel = ViewModelProviders.of(this, GameViewModelFactory(wordList)).get(GameViewModel::class.java)
+        // Bind LiveData with Activity
+        viewModel.currentWordNotifier.observe(this, Observer { text -> updateWordText(text) })
+        viewModel.scoreNotifier.observe(this, Observer { score -> updateScoreText(score) })
+        viewModel.isGameFinished.observe(this, Observer { isFinished ->
+            if (isFinished) {
+                gameFinished()
+            }
+        })
+        viewModel.currentTime.observe(this, Observer { newTime ->
+            binding.timerText.text = DateUtils.formatElapsedTime(newTime)
+        })
         // resetList()
-        viewModel.nextWord()
+        // viewModel.nextWord()
 
         binding.correctButton.setOnClickListener {
             viewModel.onCorrect()
-            updateWordText()
-            updateScoreText()
         }
         binding.skipButton.setOnClickListener {
             viewModel.onSkip()
-            updateWordText()
-            updateScoreText()
         }
-        updateScoreText()
-        updateWordText()
+
         return binding.root
 
     }
@@ -78,16 +96,16 @@ class GameFragment : Fragment() {
     private fun gameFinished() {
         val action = GameFragmentDirections.actionGameToScore(viewModel.getCorrected())
         findNavController(this).navigate(action)
+        viewModel.resetGameFinished()
     }
 
     /** Methods for updating the UI **/
-
-    private fun updateWordText() {
-        binding.wordText.text = viewModel.currentWord
+    private fun updateWordText(text: String) {
+        binding.wordText.text = text
 
     }
 
-    private fun updateScoreText() {
-        binding.scoreText.text = viewModel.getCorrected().toString()
+    private fun updateScoreText(score: Int) {
+        binding.scoreText.text = score.toString()
     }
 }
