@@ -21,13 +21,26 @@ import android.text.format.DateUtils
 import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.Transformations
 import androidx.lifecycle.ViewModel
 import timber.log.Timber
 
 data class Game(val word: String, var corrected: Boolean = false, var skipped: Boolean = false)
 //data class Board(val currentWord: String = "", val score: Int = 0)
 
+private val CORRECT_BUZZ_PATTERN = longArrayOf(100, 100, 100, 100, 100, 100)
+private val PANIC_BUZZ_PATTERN = longArrayOf(0, 200)
+private val GAME_OVER_BUZZ_PATTERN = longArrayOf(0, 2000)
+private val NO_BUZZ_PATTERN = longArrayOf(0)
+
 class GameViewModel(val wordList: MutableList<Game>) : ViewModel() {
+    enum class BuzzType(val pattern: LongArray) {
+        CORRECT(CORRECT_BUZZ_PATTERN),
+        GAME_OVER(GAME_OVER_BUZZ_PATTERN),
+        COUNTDOWN_PANIC(PANIC_BUZZ_PATTERN),
+        NO_BUZZ(NO_BUZZ_PATTERN)
+    }
+
     // MAINTAINING STATE!!!
     // The current currentWord
     private val _currentWordNotifier = MutableLiveData<String>()
@@ -47,6 +60,16 @@ class GameViewModel(val wordList: MutableList<Game>) : ViewModel() {
     val currentTime: LiveData<Long>
         get() = _currentTime
 
+    val currentTimeString: LiveData<String> = Transformations.map(currentTime) { time ->
+        DateUtils.formatElapsedTime(time)
+    }
+
+    // Event that triggers the phone to buzz using different patterns,
+    // determined by BuzzType
+    private val _eventBuzz = MutableLiveData<BuzzType>()
+    val eventBuzz: LiveData<BuzzType>
+        get() = _eventBuzz
+
     private val timer: CountDownTimer
 
     // Constants for Timer
@@ -58,6 +81,9 @@ class GameViewModel(val wordList: MutableList<Game>) : ViewModel() {
         const val ONE_SECOND = 1000L
         // This is the total time of the game
         const val COUNTDOWN_TIME = 10000L
+
+        // This is the time when the phone will start buzzing each second
+        private const val COUNTDOWN_PANIC_SECONDS = 10L
     }
 
     /** Local State !!! */
@@ -70,9 +96,13 @@ class GameViewModel(val wordList: MutableList<Game>) : ViewModel() {
 
             override fun onTick(millisUntilFinished: Long) {
                 _currentTime.value = (millisUntilFinished / ONE_SECOND)
+                if (millisUntilFinished / ONE_SECOND <= COUNTDOWN_PANIC_SECONDS) {
+                    _eventBuzz.value = BuzzType.COUNTDOWN_PANIC
+                }
             }
 
             override fun onFinish() {
+                _eventBuzz.value = BuzzType.GAME_OVER
                 _isGameFinished.value = true
             }
         }
@@ -105,6 +135,7 @@ class GameViewModel(val wordList: MutableList<Game>) : ViewModel() {
         setWordAsCorrected(getWordAtPlay())
         // update score and word
         _scoreNotifier.value = getCorrected()
+        _eventBuzz.value = BuzzType.CORRECT
         nextWord()
     }
 
@@ -114,6 +145,8 @@ class GameViewModel(val wordList: MutableList<Game>) : ViewModel() {
     fun nextWord() {
         //Select and remove a currentWord from the list
         if (isGameFinished()) {
+            Timber.i("Final score is ${getCorrected()}")
+            _scoreNotifier.value = getCorrected()
             resetWordList()
         } else {
             _currentWordNotifier.value = getNextWord().word
@@ -129,6 +162,9 @@ class GameViewModel(val wordList: MutableList<Game>) : ViewModel() {
         _isGameFinished.value = false
     }
 
+    fun onBuzzComplete() {
+        _eventBuzz.value = BuzzType.NO_BUZZ
+    }
 
     /* Methods to maintain the mutable list */
     fun resetWordList(): Unit {

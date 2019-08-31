@@ -56,7 +56,11 @@ class ScoreFragment : Fragment() {
         scoreViewModel = ViewModelProviders.of(this, ScoreViewModelFactory(scoreFragmentArgs.score))
                 .get(ScoreViewModel::class.java)
 
-        scoreViewModel.score.observe(this, Observer { s ->  updateScoreText(s.toString())})
+        binding.scoreViewModel = scoreViewModel
+        //??? Is this a LifeCycleOwner?
+        binding.setLifecycleOwner(this)
+
+//        scoreViewModel.score.observe(this, Observer { s ->  updateScoreText(s.toString())})
         // Use observer to manage the actual navigation
         scoreViewModel.eventPlayAgain.observe(this, Observer {playAgain ->
             if (playAgain) {
@@ -65,14 +69,7 @@ class ScoreFragment : Fragment() {
             }
         })
 
-        // Use button click listen to change the value of liveData
-        binding.playAgainButton.setOnClickListener { scoreViewModel.onPlayAgain() }
-
         return binding.root
-    }
-
-    private fun updateScoreText(score: String) {
-        binding.scoreText.text = score
     }
 
     private fun onPlayAgain() {
